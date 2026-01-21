@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sd-frontend-secret
+type: Opaque
+stringData:
+  # Замените на реальное значение перед применением
+  SECRET_KEY: "your-super-secret-key"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sd-frontend
+  labels:
+    app: sd-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sd-frontend
+  template:
+    metadata:
+      labels:
+        app: sd-frontend
+    spec:
+      containers:
+      - name: sd-frontend
+        image: fedorafrin85/service-desk-frontend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 5000
+        env:
+        - name: BACKEND_URL
+          value: "http://sd-api-service:8000"
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sd-frontend-secret
+              key: SECRET_KEY
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 2
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "300m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sd-frontend-service
+spec:
+  selector:
+    app: sd-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+      nodePort: 30080
+  type: NodePort
